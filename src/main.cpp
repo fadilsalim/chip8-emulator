@@ -112,7 +112,7 @@ void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8,
   SDL_RenderPresent(renderer);
 }
 
-void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running, 
+void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
                   DisplayPalette &palette, int &cycles_per_frame) {
   SDL_Event event;
 
@@ -122,7 +122,7 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_ESCAPE)
         running = false;
-// Navjyoth's Palette Controls
+      // Navjyoth's Palette Controls
       if (event.key.keysym.sym == SDLK_F1) {
         palette = DisplayPalette::OriginalBw;
         apply_palette(renderer, palette);
@@ -139,7 +139,7 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
         palette = next_palette(palette);
         apply_palette(renderer, palette);
       }
-      
+
       // My Speed Controls
       if (event.key.keysym.sym == SDLK_MINUS) {
         if (cycles_per_frame > 1)
@@ -225,17 +225,18 @@ int main(int argc, char **argv) {
 
   bool running = true;
   int cycles_per_frame = 10;
+
   while (running) {
     handle_input(renderer, chip8, running, palette, cycles_per_frame);
     for (int i = 0; i < cycles_per_frame; i++) {
       chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
-    }
     }
     chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
     beeping = (chip8.get_sound_timer() > 0);
     draw_graphics(renderer, chip8, palette);
     SDL_Delay(16); // ~60 FPS
   }
+
   if (audio_device != 0)
     SDL_CloseAudioDevice(audio_device);
   SDL_DestroyRenderer(renderer);
