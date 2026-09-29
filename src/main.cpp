@@ -73,7 +73,7 @@ void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8) {
   SDL_RenderPresent(renderer);
 }
 
-void handle_input(Chip8 &chip8, bool &running) {
+void handle_input(Chip8 &chip8, bool &running, int &cycles_per_frame) {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -82,6 +82,19 @@ void handle_input(Chip8 &chip8, bool &running) {
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_ESCAPE)
         running = false;
+      if (event.key.keysym.sym == SDLK_MINUS) {
+        if (cycles_per_frame > 1)
+          cycles_per_frame--;
+        std::cout << "Emulation speed: " << cycles_per_frame
+                  << " cycles/frame\n";
+      }
+      if (event.key.keysym.sym == SDLK_EQUALS ||
+          event.key.keysym.sym == SDLK_PLUS) {
+        if (cycles_per_frame < 100)
+          cycles_per_frame++;
+        std::cout << "Emulation speed: " << cycles_per_frame
+                  << " cycles/frame\n";
+      }
       // Check which Chip-8 key was pressed
       for (int i = 0; i < 16; i++) {
         if (event.key.keysym.sym == keymap[i])
@@ -149,10 +162,11 @@ int main(int argc, char **argv) {
   chip8.load_rom(argv[1]);
 
   bool running = true;
+  int cycles_per_frame = 10;
   while (running) {
-    handle_input(chip8, running);
-    for (int i = 0; i < 10; i++) {
-      chip8.emulate_cycle(); // CPU ~625 Hz (10 cycles × 60 frames/s)
+    handle_input(chip8, running, cycles_per_frame);
+    for (int i = 0; i < cycles_per_frame; i++) {
+      chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
     }
     chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
     beeping = (chip8.get_sound_timer() > 0);
