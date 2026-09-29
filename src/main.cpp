@@ -16,7 +16,12 @@ const int SCALE = 10; // Each pixel is 10x10 screen pixels
 const int WIDTH = 64 * SCALE;
 const int HEIGHT = 32 * SCALE;
 
-enum class DisplayPalette { ClassicGreen, AmberCrt, NeonHighContrast };
+enum class DisplayPalette {
+  OriginalBw,
+  ClassicGreen,
+  AmberCrt,
+  NeonHighContrast
+};
 
 struct Palette {
   const char *name;
@@ -25,6 +30,7 @@ struct Palette {
 };
 
 const Palette kPalettes[] = {
+    {"Original Black & White", {0, 0, 0, 255}, {255, 255, 255, 255}},
     {"Classic Green", {0, 30, 0, 255}, {0, 255, 0, 255}},
     {"Amber CRT", {25, 12, 0, 255}, {255, 180, 60, 255}},
     {"Neon High Contrast", {10, 10, 18, 255}, {255, 0, 255, 255}},
@@ -107,7 +113,7 @@ void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8,
 }
 
 void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
-                 DisplayPalette &palette) {
+                  DisplayPalette &palette) {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -117,12 +123,15 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
       if (event.key.keysym.sym == SDLK_ESCAPE)
         running = false;
       if (event.key.keysym.sym == SDLK_F1) {
-        palette = DisplayPalette::ClassicGreen;
+        palette = DisplayPalette::OriginalBw;
         apply_palette(renderer, palette);
       } else if (event.key.keysym.sym == SDLK_F2) {
-        palette = DisplayPalette::AmberCrt;
+        palette = DisplayPalette::ClassicGreen;
         apply_palette(renderer, palette);
       } else if (event.key.keysym.sym == SDLK_F3) {
+        palette = DisplayPalette::AmberCrt;
+        apply_palette(renderer, palette);
+      } else if (event.key.keysym.sym == SDLK_F4) {
         palette = DisplayPalette::NeonHighContrast;
         apply_palette(renderer, palette);
       } else if (event.key.keysym.sym == SDLK_p) {
@@ -196,7 +205,7 @@ int main(int argc, char **argv) {
   Chip8 chip8;
   chip8.load_rom(argv[1]);
 
-  DisplayPalette palette = DisplayPalette::ClassicGreen;
+  DisplayPalette palette = DisplayPalette::OriginalBw;
   apply_palette(renderer, palette);
 
   bool running = true;
