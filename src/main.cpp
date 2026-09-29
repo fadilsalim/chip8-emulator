@@ -82,6 +82,17 @@ void handle_input(Chip8 &chip8, bool &running, int &cycles_per_frame) {
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_ESCAPE)
         running = false;
+    
+      // TRIGGER SAVE STATE MANAGEMENT ( SAVE = M, LOAD =N)
+      switch(event.key.keysym.sym) {
+        case SDLK_m: // Save state
+            chip8.saveState("savestate.dat");
+            break;
+        case SDLK_n: // Load state
+            chip8.loadState("savestate.dat");
+            break;
+        
+    }
       if (event.key.keysym.sym == SDLK_MINUS) {
         if (cycles_per_frame > 1)
           cycles_per_frame--;
