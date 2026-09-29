@@ -16,8 +16,9 @@ const int SCALE = 10; // Each pixel is 10x10 screen pixels
 const int WIDTH = 64 * SCALE;
 const int HEIGHT = 32 * SCALE;
 
-// Keyboard mapping
-uint8_t keymap[16] = {
+// Keyboard mapping — SDL_Keycode is int32_t; uint8_t would silently truncate
+// values > 0xFF (e.g. arrow keys), and causes type-mismatch in comparisons.
+SDL_Keycode keymap[16] = {
     SDLK_x, // 0
     SDLK_1, // 1
     SDLK_2, // 2
@@ -140,6 +141,10 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  // Disable the OS text-input / IME pipeline so that holding letter or digit
+  // keys does not trigger accent chooser menus (KDE/GNOME on Linux/macOS).
+  SDL_StopTextInput();
+
   Chip8 chip8;
   chip8.load_rom(argv[1]);
 
@@ -147,12 +152,12 @@ int main(int argc, char **argv) {
   while (running) {
     handle_input(chip8, running);
     for (int i = 0; i < 10; i++) {
-      chip8.emulate_cycle();
+      chip8.emulate_cycle(); // CPU ~625 Hz (10 cycles × 60 frames/s)
     }
-    SDL_Delay(16); // ~60 FPS: delay once per rendered frame, not per cycle
-
+    chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
     beeping = (chip8.get_sound_timer() > 0);
     draw_graphics(renderer, chip8);
+    SDL_Delay(16); // ~60 FPS
   }
   if (audio_device != 0)
     SDL_CloseAudioDevice(audio_device);

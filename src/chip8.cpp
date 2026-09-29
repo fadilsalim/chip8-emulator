@@ -310,7 +310,13 @@ void Chip8::emulate_cycle() {
     pc += 2;
     break;
   }
-  // We now update the timers
+  // Timers are NOT decremented here.
+  // Call tick_timers() once per 60Hz frame from the main loop.
+}
+
+void Chip8::tick_timers() {
+  // Called once per rendered frame (~60Hz), not once per CPU cycle.
+  // Keeps timer rate at 60Hz regardless of how many cycles run per frame.
   if (delay_timer > 0)
     delay_timer--;
   if (sound_timer > 0) {
