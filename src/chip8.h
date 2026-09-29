@@ -11,6 +11,13 @@ public:
   void emulate_cycle();                       // To execute one instruction
   void tick_timers(); // Decrement timers at 60Hz — call once per rendered frame
   bool draw_flag;     // When we need to redraw the screen;
+
+  //Savestate management: Dumps and restores the exact state of the emulator 
+  //using binary file streams to pause/resume the gameplay
+  
+  void saveState(const std::string& filename);
+  void loadState(const std::string& filename);
+  
   uint8_t display[64 * 32];
   uint8_t key[16]; // Keyboard of 16 keys
   uint8_t get_sound_timer() const {

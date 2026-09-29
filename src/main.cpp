@@ -122,7 +122,17 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_ESCAPE)
         running = false;
-      // Navjyoth's Palette Controls
+      // --- Ishwar's Save/Load Controls ---
+      switch (event.key.keysym.sym) {
+      case SDLK_m: // Save state
+        chip8.saveState("savestate.dat");
+        break;
+      case SDLK_n: // Load state
+        chip8.loadState("savestate.dat");
+        break;
+      }
+
+      // --- Navjyoth's Palette Controls ---
       if (event.key.keysym.sym == SDLK_F1) {
         palette = DisplayPalette::OriginalBw;
         apply_palette(renderer, palette);
@@ -139,8 +149,7 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
         palette = next_palette(palette);
         apply_palette(renderer, palette);
       }
-
-      // My Speed Controls
+      // My speed controls
       if (event.key.keysym.sym == SDLK_MINUS) {
         if (cycles_per_frame > 1)
           cycles_per_frame--;
