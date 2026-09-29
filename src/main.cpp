@@ -16,6 +16,41 @@ const int SCALE = 10; // Each pixel is 10x10 screen pixels
 const int WIDTH = 64 * SCALE;
 const int HEIGHT = 32 * SCALE;
 
+enum class DisplayPalette {
+  OriginalBw,
+  ClassicGreen,
+  AmberCrt,
+  NeonHighContrast
+};
+
+struct Palette {
+  const char *name;
+  SDL_Color background;
+  SDL_Color foreground;
+};
+
+const Palette kPalettes[] = {
+    {"Original Black & White", {0, 0, 0, 255}, {255, 255, 255, 255}},
+    {"Classic Green", {0, 30, 0, 255}, {0, 255, 0, 255}},
+    {"Amber CRT", {25, 12, 0, 255}, {255, 180, 60, 255}},
+    {"Neon High Contrast", {10, 10, 18, 255}, {255, 0, 255, 255}},
+};
+
+const int kPaletteCount = sizeof(kPalettes) / sizeof(kPalettes[0]);
+
+DisplayPalette next_palette(DisplayPalette palette) {
+  int index = static_cast<int>(palette);
+  index = (index + 1) % kPaletteCount;
+  return static_cast<DisplayPalette>(index);
+}
+
+void apply_palette(SDL_Renderer *renderer, DisplayPalette palette) {
+  const Palette &current = kPalettes[static_cast<int>(palette)];
+  SDL_SetRenderDrawColor(renderer, current.background.r, current.background.g,
+                         current.background.b, current.background.a);
+  std::cout << "Display palette: " << current.name << std::endl;
+}
+
 // Keyboard mapping — SDL_Keycode is int32_t; uint8_t would silently truncate
 // values > 0xFF (e.g. arrow keys), and causes type-mismatch in comparisons.
 SDL_Keycode keymap[16] = {
@@ -55,12 +90,16 @@ void audio_callback(void *userdata, uint8_t *stream, int len) {
   }
 }
 
-void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8) {
-  // Clear screen
-  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8,
+                   DisplayPalette palette) {
+  const Palette &current = kPalettes[static_cast<int>(palette)];
+
+  SDL_SetRenderDrawColor(renderer, current.background.r, current.background.g,
+                         current.background.b, current.background.a);
   SDL_RenderClear(renderer);
-  // Drawing white pixels
-  SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+
+  SDL_SetRenderDrawColor(renderer, current.foreground.r, current.foreground.g,
+                         current.foreground.b, current.foreground.a);
   for (int y = 0; y < 32; y++) {
     for (int x = 0; x < 64; x++) {
       if (chip8.display[x + (y * 64)] == 1) {
@@ -73,7 +112,8 @@ void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8) {
   SDL_RenderPresent(renderer);
 }
 
-void handle_input(Chip8 &chip8, bool &running, int &cycles_per_frame) {
+void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running, 
+                  DisplayPalette &palette, int &cycles_per_frame) {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -82,6 +122,25 @@ void handle_input(Chip8 &chip8, bool &running, int &cycles_per_frame) {
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_ESCAPE)
         running = false;
+// Navjyoth's Palette Controls
+      if (event.key.keysym.sym == SDLK_F1) {
+        palette = DisplayPalette::OriginalBw;
+        apply_palette(renderer, palette);
+      } else if (event.key.keysym.sym == SDLK_F2) {
+        palette = DisplayPalette::ClassicGreen;
+        apply_palette(renderer, palette);
+      } else if (event.key.keysym.sym == SDLK_F3) {
+        palette = DisplayPalette::AmberCrt;
+        apply_palette(renderer, palette);
+      } else if (event.key.keysym.sym == SDLK_F4) {
+        palette = DisplayPalette::NeonHighContrast;
+        apply_palette(renderer, palette);
+      } else if (event.key.keysym.sym == SDLK_p) {
+        palette = next_palette(palette);
+        apply_palette(renderer, palette);
+      }
+      
+      // My Speed Controls
       if (event.key.keysym.sym == SDLK_MINUS) {
         if (cycles_per_frame > 1)
           cycles_per_frame--;
@@ -161,16 +220,20 @@ int main(int argc, char **argv) {
   Chip8 chip8;
   chip8.load_rom(argv[1]);
 
+  DisplayPalette palette = DisplayPalette::OriginalBw;
+  apply_palette(renderer, palette);
+
   bool running = true;
   int cycles_per_frame = 10;
   while (running) {
-    handle_input(chip8, running, cycles_per_frame);
+    handle_input(renderer, chip8, running, palette, cycles_per_frame);
     for (int i = 0; i < cycles_per_frame; i++) {
       chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
     }
+    }
     chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
     beeping = (chip8.get_sound_timer() > 0);
-    draw_graphics(renderer, chip8);
+    draw_graphics(renderer, chip8, palette);
     SDL_Delay(16); // ~60 FPS
   }
   if (audio_device != 0)
