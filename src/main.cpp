@@ -16,8 +16,8 @@ const int SCALE = 10; // Each pixel is 10x10 screen pixels
 const int WIDTH = 64 * SCALE;
 const int HEIGHT = 32 * SCALE;
 
-// Keyboard mapping — SDL_Keycode is int32_t; uint8_t would silently truncate
-SDL_Keycode keymap[16] = {
+// Keyboard mapping
+uint8_t keymap[16] = {
     SDLK_x, // 0
     SDLK_1, // 1
     SDLK_2, // 2
