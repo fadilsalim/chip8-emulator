@@ -10,6 +10,7 @@
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_video.h>
 #include <cstdint>
+#include <deque>
 #include <filesystem>
 #include <iostream>
 // Dear ImGui — core + SDL2 / SDLRenderer2 backends
@@ -123,7 +124,8 @@ void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8,
 }
 
 void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
-                  DisplayPalette &palette, int &cycles_per_frame) {
+                  DisplayPalette &palette, int &cycles_per_frame,
+                  bool &rewinding) {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -134,6 +136,8 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_ESCAPE)
         running = false;
+      if (event.key.keysym.sym == SDLK_BACKSPACE)
+        rewinding = true;
       // --- Ishwar's Save/Load Controls ---
       switch (event.key.keysym.sym) {
       case SDLK_m: // Save state
@@ -182,6 +186,8 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
       }
     }
     if (event.type == SDL_KEYUP) {
+      if (event.key.keysym.sym == SDLK_BACKSPACE)
+        rewinding = false;
       for (int i = 0; i < 16; i++) {
         if (event.key.keysym.sym == keymap[i])
           chip8.key[i] = 0;
@@ -249,6 +255,8 @@ int main(int argc, char **argv) {
 
   Chip8 chip8;
   bool rom_loaded = false;
+  std::deque<Chip8> history;
+  bool rewinding = false;
   if (argc > 1) {
     chip8.load_rom(argv[1]); // optional: may also be loaded via the ROM browser
     rom_loaded = true;
@@ -261,7 +269,8 @@ int main(int argc, char **argv) {
   int cycles_per_frame = 10;
 
   while (running) {
-    handle_input(renderer, chip8, running, palette, cycles_per_frame);
+    handle_input(renderer, chip8, running, palette, cycles_per_frame,
+                 rewinding);
 
     // 1. Start the ImGui frame FIRST so is_paused is known before CPU runs.
     ImGui_ImplSDLRenderer2_NewFrame();
@@ -304,6 +313,7 @@ int main(int argc, char **argv) {
         if (ImGui::Button(filename.c_str())) {
           chip8.load_rom(entry.path().string().c_str());
           rom_loaded = true;
+          history.clear(); // Wipe timeline so we can't rewind into the previous game
         }
       }
     } catch (const std::filesystem::filesystem_error &) {
@@ -313,12 +323,21 @@ int main(int argc, char **argv) {
     ImGui::End();
 
     // 2. Run the CHIP-8 CPU only when a ROM is loaded and not paused.
-    if (!is_paused && rom_loaded) {
+    if (rewinding && !history.empty()) {
+      chip8 = history.back();
+      history.pop_back();
+      beeping = false;
+    } else if (!is_paused && rom_loaded) {
       for (int i = 0; i < cycles_per_frame; i++) {
         chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
       }
       chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
       beeping = (chip8.get_sound_timer() > 0);
+
+      history.push_back(chip8);
+      if (history.size() > 600) {
+        history.pop_front();
+      }
     } else {
       beeping = false; // silence audio when paused or no ROM loaded
     }
