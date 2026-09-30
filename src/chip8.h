@@ -34,6 +34,7 @@ private:
   uint8_t sound_timer; // Beeps when greater than 0, counts down at 60Hz
   uint16_t opcode;     // Current instruction
   void initialise();   // Initialises everything
+  void reset();        // Wipes emulator state clean
   void load_fonts();   // Loads font (0-9, A-F)
 };
 
