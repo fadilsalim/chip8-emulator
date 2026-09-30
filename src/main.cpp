@@ -11,6 +11,7 @@
 #include <SDL2/SDL_video.h>
 #include <cstdint>
 #include <iostream>
+#include <deque> //for time travelling purposes(intended use)
 
 const int SCALE = 10; // Each pixel is 10x10 screen pixels
 const int WIDTH = 64 * SCALE;
@@ -113,7 +114,7 @@ void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8,
 }
 
 void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
-                  DisplayPalette &palette, int &cycles_per_frame) {
+                  DisplayPalette &palette, int &cycles_per_frame,bool &rewinding) {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -122,6 +123,11 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
     if (event.type == SDL_KEYDOWN) {
       if (event.key.keysym.sym == SDLK_ESCAPE)
         running = false;
+
+        //Time tt
+        if(event.key.keysym.sym == SDLK_BACKSPACE){
+          rewinding = true;
+        }
       // --- Ishwar's Save/Load Controls ---
       switch (event.key.keysym.sym) {
       case SDLK_m: // Save state
@@ -170,6 +176,9 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
       }
     }
     if (event.type == SDL_KEYUP) {
+      //---Time-Travel Control.
+      if(event.key.keysym.sym == SDLK_BACKSPACE)
+      rewinding = false;
       for (int i = 0; i < 16; i++) {
         if (event.key.keysym.sym == keymap[i])
           chip8.key[i] = 0;
@@ -235,16 +244,34 @@ int main(int argc, char **argv) {
   bool running = true;
   int cycles_per_frame = 10;
 
+  //Variable for Arjun meow
+  bool rewinding  = false;
+  std::deque<Chip8> history;
   while (running) {
-    handle_input(renderer, chip8, running, palette, cycles_per_frame);
-    for (int i = 0; i < cycles_per_frame; i++) {
-      chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
+
+    handle_input(renderer, chip8, running, palette, cycles_per_frame,rewinding);
+    if(rewinding){
+      //we pause and move back essentially time travel
+      if(!history.empty()){
+        chip8 = history.back();
+        history.pop_back();
+      }
     }
-    chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
-    beeping = (chip8.get_sound_timer() > 0);
-    draw_graphics(renderer, chip8, palette);
-    SDL_Delay(16); // ~60 FPS
-  }
+      else{
+        for (int i = 0; i < cycles_per_frame; i++) {
+          chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
+        }
+        chip8.tick_timers(); // timers at correct 60Hz, decoled from CPU rate
+        history.push_back(chip8);
+
+        if(history.size()>600){
+          history.pop_front();
+        }
+      }
+      beeping = (chip8.get_sound_timer() > 0);
+      draw_graphics(renderer, chip8, palette);
+      SDL_Delay(16); // ~60 FPS
+    }
 
   if (audio_device != 0)
     SDL_CloseAudioDevice(audio_device);
