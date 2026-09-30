@@ -17,6 +17,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
+#include <cmath>
 
 const int SCALE = 10; // Each pixel is 10x10 screen pixels
 const int WIDTH = 64 * SCALE;
@@ -79,20 +80,62 @@ SDL_Keycode keymap[16] = {
 };
 
 void audio_callback(void *userdata, uint8_t *stream, int len) {
-  static uint32_t sample_index = 0;
+  static uint32_t global_sample = 0;
   int16_t *audio_buffer = (int16_t *)stream;
   int samples = len / 2;
+  const int AMPLITUDE = 1200; // Softer volume for background music
+  const double SAMPLE_RATE = 44100.0;
+
+  // A soothing, upbeat 16-note retro 8-bit arpeggio background music loop
+  const double melody[] = {
+      523.25, 659.25, 783.99, 880.00,  // C5, E5, G5, A5
+      783.99, 659.25, 523.25, 392.00,  // G5, E5, C5, G4
+      440.00, 523.25, 659.25, 783.99,  // A4, C5, E5, G5
+      659.25, 523.25, 440.00, 392.00   // E5, C5, A4, G4
+  };
+  const int num_notes = 16;
+  const uint32_t samples_per_note = 11025; // ~0.25 seconds per note at 44.1kHz
+  const uint32_t total_loop_samples = num_notes * samples_per_note;
 
   bool *beeping = (bool *)userdata;
+
   for (int i = 0; i < samples; i++) {
-    if (*beeping) {
-      // Generating 440Hz sqaure wave
-      int16_t value = ((sample_index++ / 100) % 2) ? 3000 : -3000;
-      audio_buffer[i] = value;
+    // 1. Generate Background Music (Smooth Triangle Wave)
+    uint32_t loop_pos = global_sample % total_loop_samples;
+    int note_index = loop_pos / samples_per_note;
+    double freq = melody[note_index];
+
+    uint32_t note_sample = loop_pos % samples_per_note;
+    double period = SAMPLE_RATE / freq;
+    double phase = std::fmod((double)note_sample, period) / period;
+    
+    int16_t bgm_value = 0;
+    if (phase < 0.5) {
+      bgm_value = AMPLITUDE * (4.0 * phase - 1.0);
     } else {
-      audio_buffer[i] = 0; // Silence
-      sample_index = 0;
+      bgm_value = AMPLITUDE * (3.0 - 4.0 * phase);
     }
+
+    // 2. Layer the crisp 8-bit single beep sound effect when active
+    if (beeping && *beeping) {
+      const double sfx_frequency = 880.0; // Crisp arcade beep pitch
+      double sfx_period = SAMPLE_RATE / sfx_frequency;
+      bool sfx_high = std::fmod((double)global_sample, sfx_period) < (sfx_period / 2.0);
+      
+      // Snappy volume envelope to keep the beep clean
+      double sfx_progress = (double)(global_sample % (int)SAMPLE_RATE) / SAMPLE_RATE;
+      double sfx_envelope = 1.0 - (sfx_progress * 2.0);
+      if (sfx_envelope < 0.2) sfx_envelope = 0.2;
+
+      int16_t sfx_value = sfx_high ? (2000 * sfx_envelope) : (-2000 * sfx_envelope);
+      
+      // Blend BGM and SFX together so they don't clip
+      audio_buffer[i] = (bgm_value / 2) + (sfx_value / 2);
+    } else {
+      audio_buffer[i] = bgm_value;
+    }
+
+    global_sample++;
   }
 }
 
