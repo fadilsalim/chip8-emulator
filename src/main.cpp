@@ -254,30 +254,47 @@ int main(int argc, char **argv) {
 
   while (running) {
     handle_input(renderer, chip8, running, palette, cycles_per_frame);
-    for (int i = 0; i < cycles_per_frame; i++) {
-      chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
-    }
-    chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
-    beeping = (chip8.get_sound_timer() > 0);
 
-    // 1. Draw CHIP-8 pixels onto the SDL render target.
-    draw_graphics(renderer, chip8, palette);
-
-    // 2. Build the ImGui frame that overlays on top.
+    // 1. Start the ImGui frame FIRST so is_paused is known before CPU runs.
     ImGui_ImplSDLRenderer2_NewFrame();
     ImGui_ImplSDL2_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::Begin("Settings");
+    // ImGui::Begin returns false (and collapses the window) when minimised.
+    // We repurpose the expanded state as a pause signal: settings open = paused.
+    bool is_settings_open = ImGui::Begin("Settings");
+    bool is_paused = is_settings_open; // paused while the panel is expanded
+
     ImGui::SliderInt("Speed", &cycles_per_frame, 1, 100);
-    ImGui::Text("F1-F4 / P  — cycle palette");
-    ImGui::Text("ESC        — quit");
+
+    if (ImGui::Button("Cycle Palette")) {
+      palette = next_palette(palette);
+      apply_palette(renderer, palette);
+    }
+
+    if (ImGui::Button("Quit Emulator")) {
+      running = false;
+    }
+
     ImGui::End();
 
+    // 2. Run the CHIP-8 CPU only when not paused.
+    if (!is_paused) {
+      for (int i = 0; i < cycles_per_frame; i++) {
+        chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
+      }
+      chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
+      beeping = (chip8.get_sound_timer() > 0);
+    } else {
+      beeping = false; // silence audio so the tone doesn't loop while paused
+    }
+
+    // 3. Draw CHIP-8 pixels onto the SDL render target.
+    draw_graphics(renderer, chip8, palette);
+
+    // 4. Overlay ImGui and present both in one flip.
     ImGui::Render();
     ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
-
-    // 3. Present everything (CHIP-8 + ImGui) in one flip.
     SDL_RenderPresent(renderer);
 
     SDL_Delay(16); // ~60 FPS
