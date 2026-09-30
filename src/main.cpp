@@ -11,6 +11,10 @@
 #include <SDL2/SDL_video.h>
 #include <cstdint>
 #include <iostream>
+// Dear ImGui — core + SDL2 / SDLRenderer2 backends
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdlrenderer2.h"
 
 const int SCALE = 10; // Each pixel is 10x10 screen pixels
 const int WIDTH = 64 * SCALE;
@@ -109,7 +113,9 @@ void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8,
       }
     }
   }
-  SDL_RenderPresent(renderer);
+  // NOTE: SDL_RenderPresent is intentionally NOT called here.
+  // ImGui renders on top of the CHIP-8 pixels, so present happens after
+  // ImGui_ImplSDLRenderer2_RenderDrawData() in the main loop.
 }
 
 void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
@@ -117,6 +123,8 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
+    // Let ImGui consume the event first so its widgets stay responsive.
+    ImGui_ImplSDL2_ProcessEvent(&event);
     if (event.type == SDL_QUIT)
       running = false;
     if (event.type == SDL_KEYDOWN) {
@@ -226,6 +234,15 @@ int main(int argc, char **argv) {
   // keys does not trigger accent chooser menus (KDE/GNOME on Linux/macOS).
   SDL_StopTextInput();
 
+  // --- ImGui initialisation ---
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+  ImGuiIO &io = ImGui::GetIO();
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  ImGui::StyleColorsDark();
+  ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
+  ImGui_ImplSDLRenderer2_Init(renderer);
+
   Chip8 chip8;
   chip8.load_rom(argv[1]);
 
@@ -242,9 +259,34 @@ int main(int argc, char **argv) {
     }
     chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
     beeping = (chip8.get_sound_timer() > 0);
+
+    // 1. Draw CHIP-8 pixels onto the SDL render target.
     draw_graphics(renderer, chip8, palette);
+
+    // 2. Build the ImGui frame that overlays on top.
+    ImGui_ImplSDLRenderer2_NewFrame();
+    ImGui_ImplSDL2_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::Begin("Settings");
+    ImGui::SliderInt("Speed", &cycles_per_frame, 1, 100);
+    ImGui::Text("F1-F4 / P  — cycle palette");
+    ImGui::Text("ESC        — quit");
+    ImGui::End();
+
+    ImGui::Render();
+    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+
+    // 3. Present everything (CHIP-8 + ImGui) in one flip.
+    SDL_RenderPresent(renderer);
+
     SDL_Delay(16); // ~60 FPS
   }
+
+  // --- ImGui shutdown ---
+  ImGui_ImplSDLRenderer2_Shutdown();
+  ImGui_ImplSDL2_Shutdown();
+  ImGui::DestroyContext();
 
   if (audio_device != 0)
     SDL_CloseAudioDevice(audio_device);
