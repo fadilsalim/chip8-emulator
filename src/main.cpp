@@ -313,6 +313,7 @@ int main(int argc, char **argv) {
         if (ImGui::Button(filename.c_str())) {
           chip8.load_rom(entry.path().string().c_str());
           rom_loaded = true;
+          history.clear(); // Wipe timeline so we can't rewind into the previous game
         }
       }
     } catch (const std::filesystem::filesystem_error &) {
