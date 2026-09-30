@@ -44,12 +44,29 @@ void Chip8::initialise() {
   draw_flag = false;
 }
 
+void Chip8::reset() {
+  std::memset(memory, 0, sizeof(memory));
+  std::memset(display, 0, sizeof(display));
+  std::memset(v, 0, sizeof(v));
+  std::memset(stack, 0, sizeof(stack));
+
+  pc = 0x200;
+  index = 0;
+  sp = 0;
+  delay_timer = 0;
+  sound_timer = 0;
+
+  load_fonts();
+}
+
 void Chip8::load_fonts() {
   for (int i = 0; i < 80; i++)
     memory[i] = chip8_fontset[i];
 }
 
 void Chip8::load_rom(const std::string &filename) {
+  this->reset();
+
   std::ifstream file(filename, std::ios::binary | std::ios::ate);
 
   if (!file.is_open()) {
@@ -71,41 +88,41 @@ void Chip8::load_rom(const std::string &filename) {
   std::cout << "Loaded ROM: " << filename << std::endl;
 }
 
-void Chip8::saveState(const std::string& filename) { 
-    std::ofstream file(filename, std::ios::binary);
-    if (file.is_open()) {
-        file.write(reinterpret_cast<char*>(memory), sizeof(memory));
-        file.write(reinterpret_cast<char*>(v), sizeof(v));
-        file.write(reinterpret_cast<char*>(&index), sizeof(index));
-        file.write(reinterpret_cast<char*>(&pc), sizeof(pc));
-        file.write(reinterpret_cast<char*>(stack), sizeof(stack));
-        file.write(reinterpret_cast<char*>(&sp), sizeof(sp));
-        file.write(reinterpret_cast<char*>(&delay_timer), sizeof(delay_timer));
-        file.write(reinterpret_cast<char*>(&sound_timer), sizeof(sound_timer));
-        file.write(reinterpret_cast<char*>(display), sizeof(display));
-        
-        
-        file.close();
-    }
-} 
+void Chip8::saveState(const std::string &filename) {
+  std::ofstream file(filename, std::ios::binary);
+  if (file.is_open()) {
+    file.write(reinterpret_cast<char *>(memory), sizeof(memory));
+    file.write(reinterpret_cast<char *>(v), sizeof(v));
+    file.write(reinterpret_cast<char *>(&index), sizeof(index));
+    file.write(reinterpret_cast<char *>(&pc), sizeof(pc));
+    file.write(reinterpret_cast<char *>(stack), sizeof(stack));
+    file.write(reinterpret_cast<char *>(&sp), sizeof(sp));
+    file.write(reinterpret_cast<char *>(&delay_timer), sizeof(delay_timer));
+    file.write(reinterpret_cast<char *>(&sound_timer), sizeof(sound_timer));
+    file.write(reinterpret_cast<char *>(display), sizeof(display));
 
-void Chip8::loadState(const std::string& filename) { 
-    std::ifstream file(filename, std::ios::binary);
-    if (file.is_open()) {
-        file.read(reinterpret_cast<char*>(memory), sizeof(memory));
-        file.read(reinterpret_cast<char*>(v), sizeof(v));
-        file.read(reinterpret_cast<char*>(&index), sizeof(index));
-        file.read(reinterpret_cast<char*>(&pc), sizeof(pc));
-        file.read(reinterpret_cast<char*>(stack), sizeof(stack));
-        file.read(reinterpret_cast<char*>(&sp), sizeof(sp));
-        file.read(reinterpret_cast<char*>(&delay_timer), sizeof(delay_timer));
-        file.read(reinterpret_cast<char*>(&sound_timer), sizeof(sound_timer));
-        file.read(reinterpret_cast<char*>(display), sizeof(display));// reading variables
-        draw_flag = true; // force immediate screen redraw
-        
-        file.close();
-    }
-} 
+    file.close();
+  }
+}
+
+void Chip8::loadState(const std::string &filename) {
+  std::ifstream file(filename, std::ios::binary);
+  if (file.is_open()) {
+    file.read(reinterpret_cast<char *>(memory), sizeof(memory));
+    file.read(reinterpret_cast<char *>(v), sizeof(v));
+    file.read(reinterpret_cast<char *>(&index), sizeof(index));
+    file.read(reinterpret_cast<char *>(&pc), sizeof(pc));
+    file.read(reinterpret_cast<char *>(stack), sizeof(stack));
+    file.read(reinterpret_cast<char *>(&sp), sizeof(sp));
+    file.read(reinterpret_cast<char *>(&delay_timer), sizeof(delay_timer));
+    file.read(reinterpret_cast<char *>(&sound_timer), sizeof(sound_timer));
+    file.read(reinterpret_cast<char *>(display),
+              sizeof(display)); // reading variables
+    draw_flag = true;           // force immediate screen redraw
+
+    file.close();
+  }
+}
 
 void Chip8::emulate_cycle() {
   opcode = memory[pc] << 8 | memory[pc + 1]; // 16-bit instruction

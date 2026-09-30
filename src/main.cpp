@@ -10,6 +10,7 @@
 #include <SDL2/SDL_timer.h>
 #include <SDL2/SDL_video.h>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 // Dear ImGui — core + SDL2 / SDLRenderer2 backends
 #include "imgui.h"
@@ -95,12 +96,15 @@ void audio_callback(void *userdata, uint8_t *stream, int len) {
 }
 
 void draw_graphics(SDL_Renderer *renderer, Chip8 &chip8,
-                   DisplayPalette palette) {
+                   DisplayPalette palette, bool rom_loaded) {
   const Palette &current = kPalettes[static_cast<int>(palette)];
 
   SDL_SetRenderDrawColor(renderer, current.background.r, current.background.g,
                          current.background.b, current.background.a);
   SDL_RenderClear(renderer);
+
+  if (!rom_loaded)
+    return; // Just leave the clear background
 
   SDL_SetRenderDrawColor(renderer, current.foreground.r, current.foreground.g,
                          current.foreground.b, current.foreground.a);
@@ -188,8 +192,8 @@ void handle_input(SDL_Renderer *renderer, Chip8 &chip8, bool &running,
 
 int main(int argc, char **argv) {
   if (argc < 2) {
-    std::cerr << "Usage: " << argv[0] << " <ROM file>" << std::endl;
-    return 1;
+    std::cerr << "No ROM provided — use the in-game browser to load one.\n";
+    // Don't exit: the ROM browser lets the user pick one at runtime.
   }
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
     std::cerr << "SDL Error: " << SDL_GetError() << std::endl;
@@ -244,7 +248,11 @@ int main(int argc, char **argv) {
   ImGui_ImplSDLRenderer2_Init(renderer);
 
   Chip8 chip8;
-  chip8.load_rom(argv[1]);
+  bool rom_loaded = false;
+  if (argc > 1) {
+    chip8.load_rom(argv[1]); // optional: may also be loaded via the ROM browser
+    rom_loaded = true;
+  }
 
   DisplayPalette palette = DisplayPalette::OriginalBw;
   apply_palette(renderer, palette);
@@ -284,21 +292,39 @@ int main(int argc, char **argv) {
       running = false;
     }
 
+    // --- ROM Browser ---
+    ImGui::Separator();
+    ImGui::Text("Available ROMs:");
+    try {
+      for (const auto &entry :
+           std::filesystem::directory_iterator("roms")) {
+        if (!entry.is_regular_file())
+          continue;
+        std::string filename = entry.path().filename().string();
+        if (ImGui::Button(filename.c_str())) {
+          chip8.load_rom(entry.path().string().c_str());
+          rom_loaded = true;
+        }
+      }
+    } catch (const std::filesystem::filesystem_error &) {
+      ImGui::TextDisabled("(roms/ folder not found)");
+    }
+
     ImGui::End();
 
-    // 2. Run the CHIP-8 CPU only when not paused.
-    if (!is_paused) {
+    // 2. Run the CHIP-8 CPU only when a ROM is loaded and not paused.
+    if (!is_paused && rom_loaded) {
       for (int i = 0; i < cycles_per_frame; i++) {
         chip8.emulate_cycle(); // CPU speed depends on cycles_per_frame
       }
       chip8.tick_timers(); // timers at correct 60Hz, decoupled from CPU rate
       beeping = (chip8.get_sound_timer() > 0);
     } else {
-      beeping = false; // silence audio so the tone doesn't loop while paused
+      beeping = false; // silence audio when paused or no ROM loaded
     }
 
     // 3. Draw CHIP-8 pixels onto the SDL render target.
-    draw_graphics(renderer, chip8, palette);
+    draw_graphics(renderer, chip8, palette, rom_loaded);
 
     // 4. Overlay ImGui and present both in one flip.
     ImGui::Render();
