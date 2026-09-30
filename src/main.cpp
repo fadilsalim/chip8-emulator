@@ -272,6 +272,14 @@ int main(int argc, char **argv) {
       apply_palette(renderer, palette);
     }
 
+    if (ImGui::Button("Save State")) {
+      chip8.saveState("savestate.dat");
+    }
+
+    if (ImGui::Button("Load State")) {
+      chip8.loadState("savestate.dat");
+    }
+
     if (ImGui::Button("Quit Emulator")) {
       running = false;
     }
